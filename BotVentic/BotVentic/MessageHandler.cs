@@ -13,7 +13,7 @@ namespace BotVentic
 
         public static async void HandleIncomingMessage(object client, MessageEventArgs e)
         {
-            System.Console.Write(e.User);
+            
             if (e != null && e.Message != null && !e.Message.IsAuthor)
             {
                 string server = e.Message.Server == null ? "1-1" : e.Message.Server.Name;
@@ -265,14 +265,24 @@ namespace BotVentic
                     }
                     break;
                 case "!joinffz":
-                    if (words.Length > 1 && (e.User.Name.ToLower() == "bombmask") || e.User.Name.ToLower() == "ortho")
+                    
+                    bool bUserHasBotRole = false;
+                    if (!e.Channel.IsPrivate)
                     {
-                        // Get Everything but the first argument
-                        var SubListChannels = words.ToList().GetRange(1, words.Length - 1);
-                        
-                        Program.AddFFZEmotes(SubListChannels.ToArray());
-                    }
+                        foreach (var Role in e.Member.Roles)
+                        {
+                            if (Role.Name == "BotMaker")
+                            {
+                                bUserHasBotRole = true;
+                                break;//Leave foreach
+                            }
+                        }
 
+                        if (!bUserHasBotRole) { break; }//Leave switch statment
+                        int totalEmotes = Program.AddFFZEmotes(words.ToList().GetRange(1, words.Length - 1).ToArray());
+                        reply = String.Format("({0}) New FFZ Emotes Added", totalEmotes);
+                    }
+                    
                     break;
             }
 
