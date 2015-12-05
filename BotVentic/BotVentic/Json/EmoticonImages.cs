@@ -74,7 +74,6 @@ namespace BotVentic.Json
         [JsonProperty("set")]
         public FFZEmoticonImages Set { get; set; }
 
-        public int status;
     }
 
     class FFZRoomData
