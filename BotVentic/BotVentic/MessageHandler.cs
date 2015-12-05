@@ -13,6 +13,7 @@ namespace BotVentic
 
         public static async void HandleIncomingMessage(object client, MessageEventArgs e)
         {
+            System.Console.Write(e.User);
             if (e != null && e.Message != null && !e.Message.IsAuthor)
             {
                 string server = e.Message.Server == null ? "1-1" : e.Message.Server.Name;
@@ -33,7 +34,7 @@ namespace BotVentic
                     }
                 }
 
-                reply = HandleCommands(reply, words);
+                reply = HandleCommands(reply, words, e);
 
                 if (reply == null)
                     reply = HandleEmotesAndConversions(reply, words);
@@ -62,7 +63,7 @@ namespace BotVentic
                 string reply = null;
                 string[] words = e.Message.RawText.Split(' ');
 
-                reply = HandleCommands(reply, words);
+                reply = HandleCommands(reply, words, e);
 
                 if (reply == null)
                 {
@@ -174,13 +175,13 @@ namespace BotVentic
                 case "bttv":
                     reply = "https:" + Program.BttvTemplate.Replace("{{id}}", emote_info[0]).Replace("{{image}}", "2x"); break;
                 case "ffz":
-                    reply = "http://cdn.frankerfacez.com/emoticon/" + emote_info[0] + "/2"; break;
+                    reply = "https:" + emote_info[0]; break;
             }
 
             return reply;
         }
 
-        private static string HandleCommands(string reply, string[] words)
+        private static string HandleCommands(string reply, string[] words, MessageEventArgs e)
         {
             if (words == null || words.Length < 0)
                 return "An error occurred.";
@@ -262,6 +263,16 @@ namespace BotVentic
                                 break;
                         }
                     }
+                    break;
+                case "!joinffz":
+                    if (words.Length > 1 && (e.User.Name.ToLower() == "bombmask") || e.User.Name.ToLower() == "ortho")
+                    {
+                        // Get Everything but the first argument
+                        var SubListChannels = words.ToList().GetRange(1, words.Length - 1);
+                        
+                        Program.AddFFZEmotes(SubListChannels.ToArray());
+                    }
+
                     break;
             }
 
