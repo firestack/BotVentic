@@ -47,6 +47,9 @@ namespace BotVentic.Json
         [JsonProperty("id")]
         public int Id { get; set; }
 
+        [JsonProperty("urls")]
+        public Dictionary<string, string> EmoteLinks { get; set; }
+
         [JsonProperty("name")]
         public string Code { get; set; }
     }
@@ -60,9 +63,30 @@ namespace BotVentic.Json
         public List<FFZEmoticon> Emotes { get; set; }
     }
 
-    class FFZEmoticonSets
+    class FFZEmoticonSetsAPIGLOBALENDPOINT
     {
         [JsonProperty("sets")]
         public Dictionary<string, FFZEmoticonImages> Sets { get; set; }
     }
+
+    class FFZEmoteiconSet
+    {
+        [JsonProperty("set")]
+        public FFZEmoticonImages Set { get; set; }
+
+        public int status;
+    }
+
+    class FFZRoomData
+    {
+        [JsonProperty("set")]
+        public int Set { get; set; }
+    }
+
+    class FFZRoom
+    {
+        [JsonProperty("room")]
+        public FFZRoomData Room { get; set; }
+    }
+
 }
