@@ -194,10 +194,18 @@ namespace BotVentic
             foreach (var channel in channels)
             {
                 Console.WriteLine("Joining FFZ Channel: " + channel);
-                var id = JsonConvert.DeserializeObject<FFZRoom>(Request("https://api.frankerfacez.com/v1/_room/" + channel));
-                FFZEmoteSets.Add(id.Room.Set.ToString());
-                var emotes = JsonConvert.DeserializeObject<FFZEmoteiconSet>(Request("http://api.frankerfacez.com/v1/set/" + id.Room.Set.ToString()));
-                totalEmotesRequested += emotes.Set.Emotes.Count;
+                var request = "http://api.frankerfacez.com/v1/_room/" + channel;
+                try
+                {
+                    var id = JsonConvert.DeserializeObject<FFZRoom>(Request(request));
+                    FFZEmoteSets.Add(id.Room.Set.ToString());
+                    var emotes = JsonConvert.DeserializeObject<FFZEmoteiconSet>(Request("http://api.frankerfacez.com/v1/set/" + id.Room.Set.ToString()));
+                    totalEmotesRequested += emotes.Set.Emotes.Count;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("FFZ API Error for " + request + "; " + e.Message);
+                }
             }
             UpdateFFZEmotes();
 
