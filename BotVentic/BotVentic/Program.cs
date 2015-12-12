@@ -90,7 +90,7 @@ namespace BotVentic
         /// </summary>
         public static void UpdateEmotes()
         {
-            var emotes = JsonConvert.DeserializeObject<EmoticonImages>(Request("https://api.twitch.tv/kraken/chat/emoticon_images"));
+            var emotes = JsonConvert.DeserializeObject<EmoticonImages>(Request("http://api.twitch.tv/kraken/chat/emoticon_images"));
 
             if (emotes == null || emotes.Emotes == null)
             {
