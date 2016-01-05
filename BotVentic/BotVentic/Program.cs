@@ -16,15 +16,9 @@ namespace BotVentic
 
         public static int EditThreshold { get; set; }
         public static int EditMax { get; set; }
-        public static List<string> FFZEmoteSets = new List<string>();
 
         static void Main(string[] args)
         {
-            FFZEmoteSets.Add("3"); // Global endpoint
-            FFZEmoteSets.Add("4330"); // Weird new globals
-
-
-
             Console.WriteLine("Version " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString());
             DictEmotes = new Dictionary<string, string[]>();
 
@@ -90,7 +84,7 @@ namespace BotVentic
         /// </summary>
         public static void UpdateEmotes()
         {
-            var emotes = JsonConvert.DeserializeObject<EmoticonImages>(Request("http://api.twitch.tv/kraken/chat/emoticon_images"));
+            var emotes = JsonConvert.DeserializeObject<EmoticonImages>(Request("https://api.twitch.tv/kraken/chat/emoticon_images"));
 
             if (emotes == null || emotes.Emotes == null)
             {
@@ -100,11 +94,7 @@ namespace BotVentic
 
             foreach (var em in emotes.Emotes)
             {
-                try
-                {
-                    DictEmotes.Add(em.Code, new string[] { "" + em.Id, "twitch" });
-                }
-                catch { }
+                DictEmotes[em.Code] = new string[] { "" + em.Id, "twitch" };
             }
         }
 
@@ -125,11 +115,7 @@ namespace BotVentic
 
             foreach (var em in emotes.Emotes)
             {
-                try
-                {
-                    DictEmotes.Add(em.Code, new string[] { "" + em.Id, "bttv" });
-                }
-                catch { }
+                DictEmotes[em.Code] = new string[] { "" + em.Id, "bttv" };
             }
         }
 
@@ -139,78 +125,24 @@ namespace BotVentic
         /// </summary>
         public static void UpdateFFZEmotes()
         {
-            foreach (var EmoteSetId in FFZEmoteSets)
+            var emotes = JsonConvert.DeserializeObject<FFZEmoticonSets>(Request("http://api.frankerfacez.com/v1/set/global"));
+
+            if (emotes == null || emotes.Sets == null || emotes.Sets.Values == null)
             {
+                Console.WriteLine("Error loading ffz emotes");
+                return;
+            }
 
-                var emotes = JsonConvert.DeserializeObject<FFZEmoteiconSet>(Request("http://api.frankerfacez.com/v1/set/" + EmoteSetId));
-
-                if (emotes == null || emotes.Set == null)
+            foreach (FFZEmoticonImages set in emotes.Sets.Values)
+            {
+                if (set != null && set.Emotes != null)
                 {
-                    Console.WriteLine("Error loading ffz emotes");
-                    return;
-                }
-                foreach (var emote in emotes.Set.Emotes)
-                {
-                    if (emote != null)
+                    foreach (var em in set.Emotes)
                     {
-                        try
-                        {
-                            // Find Largest key
-                            string LargestKey = "1";
-                            foreach(var URL in emote.EmoteLinks)
-                            {
-                                if (int.Parse(URL.Key) > int.Parse(LargestKey))
-                                {
-                                    LargestKey = URL.Key;
-                                }
-                            }
-                            DictEmotes.Add(emote.Code, new string[] { emote.EmoteLinks[LargestKey], "ffz" });
-                        }
-                        catch { }
+                        DictEmotes[em.Code] = new string[] { "" + em.Id, "ffz" };
                     }
                 }
-
-                //foreach (var set in emotes.Set.Emotes)
-                //{
-                //    if (set != null )
-                //    {
-                //        foreach (var em in set.Emotes)
-                //        {
-                //            try
-                //            {
-                //                DictEmotes.Add(em.Code, new string[] { "" + em.Id, "ffz" });
-                //            }
-                //            catch { }
-                //        }
-                //    }
-                //}
             }
-            
-        }
-
-        public static int AddFFZEmotes(string[] channels)
-        {
-            int totalEmotesRequested = 0;
-            foreach (var channel in channels)
-            {
-                Console.WriteLine("Joining FFZ Channel: " + channel);
-                var request = "http://api.frankerfacez.com/v1/_room/" + channel;
-                try
-                {
-                    var id = JsonConvert.DeserializeObject<FFZRoom>(Request(request));
-                    FFZEmoteSets.Add(id.Room.Set.ToString());
-                    var emotes = JsonConvert.DeserializeObject<FFZEmoteiconSet>(Request("http://api.frankerfacez.com/v1/set/" + id.Room.Set.ToString()));
-                    totalEmotesRequested += emotes.Set.Emotes.Count;
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine("FFZ API Error for " + request + "; " + e.Message);
-                }
-            }
-            UpdateFFZEmotes();
-
-            return totalEmotesRequested;
-
         }
 
 
