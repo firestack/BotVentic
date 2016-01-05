@@ -17,6 +17,8 @@ namespace BotVentic
         public static int EditThreshold { get; set; }
         public static int EditMax { get; set; }
         public static List<string> FFZEmoteSets = new List<string>();
+        public static List<string> FFZZEmoteSets = new List<string>();
+
 
         static void Main(string[] args)
         {

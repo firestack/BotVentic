@@ -10,10 +10,12 @@ namespace BotVentic
     {
         private static Dictionary<Message, Message> BotReplies = new Dictionary<Message, Message>();
         private static Dictionary<string, string> LastHandledMessageOnChannel = new Dictionary<string, string>();
+        private static Dictionary<string, Dictionary<string, string>> ChannelDefines = new Dictionary<string, Dictionary<string, string>>();
+        private static MessageEventArgs GE;
 
         public static async void HandleIncomingMessage(object client, MessageEventArgs e)
         {
-            
+            GE = e;
             if (e != null && e.Message != null && !e.Message.IsAuthor)
             {
                 string server = e.Message.Server == null ? "1-1" : e.Message.Server.Name;
@@ -62,6 +64,7 @@ namespace BotVentic
 
         public static async void HandleEdit(object client, MessageEventArgs e)
         {
+            GE = e;
             // Don't handle own message or any message containing embeds that was *just* replied to
             if (e != null && e.Message != null && !e.Message.IsAuthor && (e.Message.Embeds.Length == 0 || !IsMessageLastRepliedTo(e)))
             {
@@ -138,6 +141,15 @@ namespace BotVentic
                 {
                     string code = word.Substring(1, word.Length - 2);
                     found = IsWordEmote(code, ref reply, false);
+                }
+                
+                else if (ChannelDefines.ContainsKey(GE.ChannelId))
+                {
+                    if (ChannelDefines[GE.ChannelId].ContainsKey(word))
+                    {
+                        reply = ChannelDefines[GE.ChannelId][word] + (reply == "" ? "" : "\n") + reply;
+                    }
+
                 }
                 if (found)
                     break;
@@ -274,7 +286,7 @@ namespace BotVentic
                     }
                     break;
                 case "!source":
-                    reply = "https://github.com/3ventic/BotVentic";
+                    reply = "https://github.com/firestack/BotVentic";
                     break;
                 case "!frozen":
                     if (words.Length >= 2 && words[1] != "pizza")
@@ -316,6 +328,54 @@ namespace BotVentic
                     }
                     
                     break;
+
+                case "#define":
+                    bUserHasBotRole = false;
+                    if (!e.Channel.IsPrivate)
+                    {
+                        foreach (var Role in e.Member.Roles)
+                        {
+                            if (Role.Name == "BotMaker")
+                            {
+                                bUserHasBotRole = true;
+                                break;//Leave foreach
+                            }
+                        }
+
+                        if (!bUserHasBotRole || words.Length < 3) { break; }//Leave switch statment
+                        if (!ChannelDefines.ContainsKey(e.ChannelId))
+                        {
+                            ChannelDefines[e.ChannelId] = new Dictionary<string, string>();
+                        }
+
+                        ChannelDefines[e.ChannelId][words[1]] = String.Join(" ", words.ToList().GetRange(2, words.Length - 2).ToArray());
+                    }
+
+                    break;
+                case "#undef":
+                    bUserHasBotRole = false;
+                    if (!e.Channel.IsPrivate)
+                    {
+                        foreach (var Role in e.Member.Roles)
+                        {
+                            if (Role.Name == "BotMaker")
+                            {
+                                bUserHasBotRole = true;
+                                break;//Leave foreach
+                            }
+                        }
+
+                        if (!bUserHasBotRole || words.Length < 1) { break; }//Leave switch statment
+                        if (!ChannelDefines.ContainsKey(e.ChannelId))
+                        {
+                            break;
+                        }
+
+                        ChannelDefines[e.ChannelId].Remove(words[1]);
+                    }
+
+                    break;
+
             }
 
             return reply;
