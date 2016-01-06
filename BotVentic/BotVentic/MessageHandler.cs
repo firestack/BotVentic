@@ -10,8 +10,8 @@ namespace BotVentic
     {
         private static Dictionary<Message, Message> BotReplies = new Dictionary<Message, Message>();
         private static Dictionary<string, string> LastHandledMessageOnChannel = new Dictionary<string, string>();
-        private static Dictionary<string, Dictionary<string, string>> ChannelDefines = new Dictionary<string, Dictionary<string, string>>();
         private static MessageEventArgs GE;
+        public static Dictionary<string, Dictionary<string, string>> ChannelDefines = new Dictionary<string, Dictionary<string, string>>();
 
         public static async void HandleIncomingMessage(object client, MessageEventArgs e)
         {
@@ -332,52 +332,48 @@ namespace BotVentic
                     break;
 
                 case "#define":
-                    bUserHasBotRole = false;
                     if (!e.Channel.IsPrivate)
                     {
-                        foreach (var Role in e.Member.Roles)
-                        {
-                            if (Role.Name == "BotMaker")
-                            {
-                                bUserHasBotRole = true;
-                                break;//Leave foreach
-                            }
-                        }
 
-                        if (!bUserHasBotRole || words.Length < 3) { break; }//Leave switch statment
+                        if (!UserHasRole("BotMaker") || words.Length < 3) { break; }//Leave switch statment
                         if (!ChannelDefines.ContainsKey(e.ServerId))
                         {
                             ChannelDefines[e.ServerId] = new Dictionary<string, string>();
                         }
 
                         ChannelDefines[e.ServerId][words[1]] = String.Join(" ", words.ToList().GetRange(2, words.Length - 2).ToArray());
+                        Program.SaveConfig();
                     }
 
                     break;
                 case "#undef":
-                    bUserHasBotRole = false;
                     if (!e.Channel.IsPrivate)
                     {
-                        foreach (var Role in e.Member.Roles)
-                        {
-                            if (Role.Name == "BotMaker")
-                            {
-                                bUserHasBotRole = true;
-                                break;//Leave foreach
-                            }
-                        }
-
-                        if (!bUserHasBotRole || words.Length < 1) { break; }//Leave switch statment
-                        if (!ChannelDefines.ContainsKey(e.ServerId))
-                        {
-                            break;
-                        }
-
+                        if (!UserHasRole("BotMaker") || words.Length < 1 || !ChannelDefines.ContainsKey(e.ServerId)) { break; }//Leave switch statment
                         ChannelDefines[e.ServerId].Remove(words[1]);
                     }
 
                     break;
 
+                case "#list":
+                    if(!e.Channel.IsPrivate && UserHasRole("BotMaker") && ChannelDefines.ContainsKey(e.ServerId))
+                    {
+                        reply = "Current Defines: ```";
+                        foreach(var kvp in ChannelDefines[e.ServerId])
+                        {
+                            reply += String.Format("#{0}:\t{1}\n", kvp.Key, kvp.Value);
+                        }
+                        reply += "```";
+                    }
+                    break; 
+
+                case "!listffz":
+                    reply = "I am using emotes from these channels: ```" + String.Join(", ", Program.FFZChannelNames) + "```";
+                    break;
+
+                case "#VERSION":
+                    reply = "Version " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString() + "\nModified by bomb" ;
+                    break;
             }
 
             return reply;
@@ -407,6 +403,23 @@ namespace BotVentic
         private static string NullToEmpty(string str)
         {
             return (str == null) ? "" : str;
+        }
+
+        private static bool UserHasRole(string RoleName)
+        {
+            if (GE.Channel.IsPrivate)
+                return false;
+
+            bool bRoleFlag = false;
+            foreach (var Role in GE.Member.Roles)
+            {
+                if (Role.Name == RoleName)
+                {
+                    bRoleFlag = true;
+                    break;//Leave foreach
+                }
+            }
+            return bRoleFlag;
         }
     }
 }

@@ -61,6 +61,7 @@
   <ItemGroup>
     <Compile Include="Json\Config.cs" />
     <Compile Include="Json\EmoticonImages.cs" />
+    <Compile Include="Json\Save.cs" />
     <Compile Include="Json\Streams.cs" />
     <Compile Include="MessageHandler.cs" />
     <Compile Include="Program.cs" />

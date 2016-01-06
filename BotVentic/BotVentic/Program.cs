@@ -16,9 +16,9 @@ namespace BotVentic
 
         public static int EditThreshold { get; set; }
         public static int EditMax { get; set; }
-        public static List<string> FFZEmoteSets = new List<string>();
-        public static List<string> FFZZEmoteSets = new List<string>();
-
+        public static HashSet<string> FFZEmoteSets = new HashSet<string>();
+        public static HashSet<string> FFZChannelNames = new HashSet<string>();
+        public static string SaveFileName = "./Save.json";
 
         static void Main(string[] args)
         {
@@ -33,12 +33,13 @@ namespace BotVentic
             Config config;
             if (File.Exists("config.json"))
             {
-                using (StreamReader sr = new StreamReader("config.json"))
-                {
-                    config = JsonConvert.DeserializeObject<Config>(sr.ReadToEnd());
-                    EditThreshold = config.EditThreshold;
-                    EditMax = config.EditMax;
-                }
+                config = JsonConvert.DeserializeObject<Config>(File.ReadAllText("config.json"));
+                EditThreshold = config.EditThreshold;
+                EditMax = config.EditMax;
+
+                LoadConfig();
+                Console.WriteLine("Loaded Config!");
+
             }
             else
             {
@@ -58,6 +59,9 @@ namespace BotVentic
             client.MessageCreated += MessageHandler.HandleIncomingMessage;
             client.MessageUpdated += MessageHandler.HandleEdit;
 
+            
+            
+
             client.Run(async () =>
             {
                 Console.WriteLine("Connecting...");
@@ -71,6 +75,8 @@ namespace BotVentic
                     return;
                 }
                 Console.WriteLine("Connected!");
+
+                
             });
             Console.WriteLine("Press Any key to quit");
             Console.ReadKey();
@@ -111,6 +117,8 @@ namespace BotVentic
         /// </summary>
         public static void UpdateBttvEmotes()
         {
+            DictEmotes["(ditto)"] = new string[] { "554da1a289d53f2d12781907", "bttv" };
+
             var emotes = JsonConvert.DeserializeObject<BttvEmoticonImages>(Request("https://api.betterttv.net/2/emotes"));
 
             if (emotes == null || emotes.Template == null || emotes.Emotes == null)
@@ -189,15 +197,50 @@ namespace BotVentic
             foreach (var channel in channels)
             {
                 Console.WriteLine("Joining FFZ Channel: " + channel);
-                var id = JsonConvert.DeserializeObject<FFZRoom>(Request("https://api.frankerfacez.com/v1/_room/" + channel));
-                FFZEmoteSets.Add(id.Room.Set.ToString());
+
+                var RequestString = Request("https://api.frankerfacez.com/v1/_room/" + channel);
+
+                if (RequestString == "") // If it is assume 404
+                    continue; // That FFZ Channel didn't exist. try next channel
+
+                // Confirmed channel exists
+                FFZChannelNames.Add(channel);
+
+                var id = JsonConvert.DeserializeObject<FFZRoom>(RequestString);
+
+                if (!FFZEmoteSets.Contains(id.Room.Set.ToString()))
+                {
+                    FFZEmoteSets.Add(id.Room.Set.ToString());
+                }
+                
                 var emotes = JsonConvert.DeserializeObject<FFZEmoteiconSet>(Request("http://api.frankerfacez.com/v1/set/" + id.Room.Set.ToString()));
                 totalEmotesRequested += emotes.Set.Emotes.Count;
             }
             UpdateFFZEmotes();
+            SaveConfig();
 
             return totalEmotesRequested;
 
+        }
+
+        public static void SaveConfig()
+        {
+            Save SaveData = new Save();
+            SaveData.FFZChannelNames = FFZChannelNames;
+            SaveData.ChannelDefines = MessageHandler.ChannelDefines;
+            SaveData.FFZChannelSetIDs = FFZEmoteSets;
+
+            File.WriteAllText(SaveFileName, JsonConvert.SerializeObject(SaveData));
+        }
+
+        public static void LoadConfig()
+        {
+            if (!File.Exists(SaveFileName)) { return; }
+            var SavedData = JsonConvert.DeserializeObject<Save>(File.ReadAllText(SaveFileName));
+
+            FFZChannelNames = SavedData.FFZChannelNames;
+            FFZEmoteSets = SavedData.FFZChannelSetIDs;
+            MessageHandler.ChannelDefines = SavedData.ChannelDefines;
         }
 
 
@@ -229,6 +272,7 @@ namespace BotVentic
             }
             catch (Exception)
             {
+
                 return "";
             }
         }
