@@ -19,8 +19,9 @@ namespace BotVentic
             if (e != null && e.Message != null && !e.Message.IsAuthor)
             {
                 string server = e.Message.Server == null ? "1-1" : e.Message.Server.Name;
+                string channel = e.Message.Channel == null ? "NULL" : e.Message.Channel.Name;
                 string user = e.Message.User == null ? "?" : e.Message.User.Name;
-                Console.WriteLine("[{0}][Message] {1}: {2}", server, user, e.Message.RawText);
+                Console.WriteLine("[{0}][{3}][Message] {1}: {2}", server, user, e.Message.RawText, channel);
                 string reply = null;
                 string[] words = e.Message.RawText.Split(' ');
 
@@ -42,9 +43,10 @@ namespace BotVentic
                             await ((DiscordClient)client).AcceptInvite(inviteWords[0]);
                             await SendReply(client, e, "Joined!");
                         }
-                        catch (Exception ex)
+                        catch /*(Exception ex)*/
                         {
-                            Console.WriteLine(ex.ToString());
+                            
+                            Console.WriteLine("Failed to join channel");
                             await SendReply(client, e, "Failed to join \"" + inviteWords[0] + "\"! Please double-check that the invite is valid and has not expired. If the issue persists, open an issue on the repository. !source for link.");
                         }
                     }
@@ -142,12 +144,12 @@ namespace BotVentic
                     string code = word.Substring(1, word.Length - 2);
                     found = IsWordEmote(code, ref reply, false);
                 }
-                
-                else if (ChannelDefines.ContainsKey(GE.ChannelId))
+
+                else if (GE.ServerId != null && ChannelDefines.ContainsKey(GE.ServerId))
                 {
-                    if (ChannelDefines[GE.ChannelId].ContainsKey(word))
+                    if (ChannelDefines[GE.ServerId].ContainsKey(word))
                     {
-                        reply = ChannelDefines[GE.ChannelId][word] + (reply == "" ? "" : "\n") + reply;
+                        reply = ChannelDefines[GE.ServerId][word] + (reply == "" ? "" : "\n") + reply;
                     }
 
                 }
@@ -343,12 +345,12 @@ namespace BotVentic
                         }
 
                         if (!bUserHasBotRole || words.Length < 3) { break; }//Leave switch statment
-                        if (!ChannelDefines.ContainsKey(e.ChannelId))
+                        if (!ChannelDefines.ContainsKey(e.ServerId))
                         {
-                            ChannelDefines[e.ChannelId] = new Dictionary<string, string>();
+                            ChannelDefines[e.ServerId] = new Dictionary<string, string>();
                         }
 
-                        ChannelDefines[e.ChannelId][words[1]] = String.Join(" ", words.ToList().GetRange(2, words.Length - 2).ToArray());
+                        ChannelDefines[e.ServerId][words[1]] = String.Join(" ", words.ToList().GetRange(2, words.Length - 2).ToArray());
                     }
 
                     break;
@@ -366,12 +368,12 @@ namespace BotVentic
                         }
 
                         if (!bUserHasBotRole || words.Length < 1) { break; }//Leave switch statment
-                        if (!ChannelDefines.ContainsKey(e.ChannelId))
+                        if (!ChannelDefines.ContainsKey(e.ServerId))
                         {
                             break;
                         }
 
-                        ChannelDefines[e.ChannelId].Remove(words[1]);
+                        ChannelDefines[e.ServerId].Remove(words[1]);
                     }
 
                     break;
