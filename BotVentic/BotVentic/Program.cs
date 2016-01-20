@@ -237,14 +237,14 @@ namespace BotVentic
             
         }
 
-        public static int AddFFZEmotes(string[] channels)
+        public static async Task<int> AddFFZEmotes(string[] channels)
         {
             int totalEmotesRequested = 0;
             foreach (var channel in channels)
             {
                 Console.WriteLine("Joining FFZ Channel: " + channel);
 
-                var RequestString = await RequestAsync("https://api.frankerfacez.com/v1/_room/" + channel);
+                string RequestString = await RequestAsync("https://api.frankerfacez.com/v1/_room/" + channel);
 
                 if (RequestString == "") // If it is assume 404
                     continue; // That FFZ Channel didn't exist. try next channel

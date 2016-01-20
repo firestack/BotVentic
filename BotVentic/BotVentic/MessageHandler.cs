@@ -330,7 +330,7 @@ namespace BotVentic
                         }
 
                         if (!bUserHasBotRole) { break; }//Leave switch statment
-                        int totalEmotes = Program.AddFFZEmotes(words.ToList().GetRange(1, words.Length - 1).ToArray());
+                        int totalEmotes = await Program.AddFFZEmotes(words.ToList().GetRange(1, words.Length - 1).ToArray());
                         reply = String.Format("({0}) New FFZ Emotes Added", totalEmotes);
                     }
                     
