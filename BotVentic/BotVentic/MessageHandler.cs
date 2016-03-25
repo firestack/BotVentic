@@ -22,9 +22,10 @@ namespace BotVentic
                 string server = e.Message.Server == null ? "1-1" : e.Message.Server.Name;
                 string channel = e.Message.Channel == null ? "NULL" : e.Message.Channel.Name;
                 string user = e.Message.User == null ? "?" : e.Message.User.Name;
-                Console.WriteLine("[{0}][{3}][Message] {1}: {2}", server, user, e.Message.RawText, channel);
+                string rawtext = e.Message.RawText ?? "";
+                Console.WriteLine("[{0}][{3}][Message] {1}: {2}", server, user, rawtext, channel);
                 string reply = null;
-                string[] words = e.Message.RawText.Split(' ');
+                string[] words = rawtext.Split(' ');
 
                 // Private message, check for invites
                 if (e.ServerId == null)
@@ -75,12 +76,14 @@ namespace BotVentic
                 if (LastHandledMessageOnChannel.ContainsKey(e.Message.ChannelId))
                     LastHandledMessageOnChannel.Remove(e.Message.ChannelId);
 
-                bool calcDate = (DateTime.Now - e.Message.Timestamp).Minutes < Program.EditThreshold;
+                bool calcDate = (DateTime.Now - e.Message.Timestamp).Minutes < DiscordBot.EditThreshold;
                 string server = e.Message.Server == null ? "1-1" : e.Message.Server.Name;
                 string user = e.Message.User == null ? "?" : e.Message.User.Name;
-                Console.WriteLine(String.Format("[{0}][Edit] {1}: {2}", server, user, e.Message.RawText));
+                string rawtext = e.Message.RawText ?? "";
+
+                Console.WriteLine(String.Format("[{0}][Edit] {1}: {2}", server, user, rawtext));
                 string reply = null;
-                string[] words = e.Message.RawText.Split(' ');
+                string[] words = rawtext.Split(' ');
 
 
                 reply = await HandleCommands(reply, words, e);
@@ -195,18 +198,18 @@ namespace BotVentic
             bool found = false;
             string[] emote_info;
 
-            if (Program.DictEmotes.TryGetValue(code, out emote_info))
+            if (DiscordBot.DictEmotes.TryGetValue(code, out emote_info))
             {
                 found = true;
                 reply = GetEmoteUrl(emote_info);
             }
             else
             {
-                foreach (var emote in Program.DictEmotes.Keys)
+                foreach (var emote in DiscordBot.DictEmotes.Keys)
                 {
                     if (emoteComparer(code, emote))
                     {
-                        reply = GetEmoteUrl(Program.DictEmotes[emote]);
+                        reply = GetEmoteUrl(DiscordBot.DictEmotes[emote]);
                         found = true;
                         break;
                     }
@@ -223,7 +226,7 @@ namespace BotVentic
                 case "twitch":
                     reply = "http://emote.3v.fi/2.0/" + emote_info[0] + ".png"; break;
                 case "bttv":
-                    reply = "https:" + Program.BttvTemplate.Replace("{{id}}", emote_info[0]).Replace("{{image}}", "2x"); break;
+                    reply = "https:" + DiscordBot.BttvTemplate.Replace("{{id}}", emote_info[0]).Replace("{{image}}", "2x"); break;
                 case "ffz":
                     reply = "https:" + emote_info[0]; break;
             }
@@ -242,7 +245,7 @@ namespace BotVentic
                 case "!stream":
                     if (words.Length > 1)
                     {
-                        string json = await Program.RequestAsync("https://api.twitch.tv/kraken/streams/" + words[1].ToLower() + "?stream_type=all");
+                        string json = await DiscordBot.RequestAsync("https://api.twitch.tv/kraken/streams/" + words[1].ToLower() + "?stream_type=all");
                         if (json != null)
                         {
                             var streams = JsonConvert.DeserializeObject<Json.Streams>(json);
@@ -273,7 +276,7 @@ namespace BotVentic
                 case "!channel":
                     if (words.Length > 1)
                     {
-                        string json = await Program.RequestAsync("https://api.twitch.tv/kraken/channels/" + words[1].ToLower());
+                        string json = await DiscordBot.RequestAsync("https://api.twitch.tv/kraken/channels/" + words[1].ToLower());
                         if (json != null)
                         {
                             var channel = JsonConvert.DeserializeObject<Json.Channel>(json);
@@ -309,7 +312,7 @@ namespace BotVentic
                         switch (words[1])
                         {
                             case "emotes":
-                                await Program.UpdateAllEmotesAsync();
+                                await DiscordBot.UpdateAllEmotesAsync();
                                 reply = "*updated list of known emotes*";
                                 break;
                         }
@@ -330,7 +333,7 @@ namespace BotVentic
                         }
 
                         if (!bUserHasBotRole) { break; }//Leave switch statment
-                        int totalEmotes = await Program.AddFFZEmotes(words.ToList().GetRange(1, words.Length - 1).ToArray());
+                        int totalEmotes = await DiscordBot.AddFFZEmotes(words.ToList().GetRange(1, words.Length - 1).ToArray());
                         reply = String.Format("({0}) New FFZ Emotes Added", totalEmotes);
                     }
                     
@@ -347,7 +350,7 @@ namespace BotVentic
                         }
 
                         ChannelDefines[e.ServerId][words[1]] = String.Join(" ", words.ToList().GetRange(2, words.Length - 2).ToArray());
-                        Program.SaveConfig();
+                        DiscordBot.SaveConfig();
                     }
 
                     break;
@@ -373,7 +376,7 @@ namespace BotVentic
                     break; 
 
                 case "!listffz":
-                    reply = "I am using emotes from these channels: ```" + String.Join(", ", Program.FFZChannelNames) + "```";
+                    reply = "I am using emotes from these channels: ```" + String.Join(", ", DiscordBot.FFZChannelNames) + "```";
                     break;
 
                 case "#VERSION":
@@ -386,7 +389,7 @@ namespace BotVentic
 
         private static void AddBotReply(Message bot, Message user)
         {
-            if (BotReplies.Count > Program.EditMax)
+            if (BotReplies.Count > DiscordBot.EditMax)
             {
                 BotReplies.Remove(BotReplies.Keys.ElementAt(0));
             }
