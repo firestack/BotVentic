@@ -2,6 +2,7 @@
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -9,10 +10,13 @@ namespace BotVentic
 {
     class MessageHandler
     {
-        private static Dictionary<Message, Message> BotReplies = new Dictionary<Message, Message>();
-        private static Dictionary<string, string> LastHandledMessageOnChannel = new Dictionary<string, string>();
+
+
         private static MessageEventArgs GE;
-        public static Dictionary<string, Dictionary<string, string>> ChannelDefines = new Dictionary<string, Dictionary<string, string>>();
+        private static MessageUpdatedEventArgs GEE;
+        public static Dictionary<ulong, Dictionary<string, string>> ChannelDefines = new Dictionary<ulong, Dictionary<string, string>>();
+        private static ConcurrentQueue<Message[]> BotReplies = new ConcurrentQueue<Message[]>();
+        private static Dictionary<ulong, ulong> LastHandledMessageOnChannel = new Dictionary<ulong, ulong>();
 
         public static async void HandleIncomingMessage(object client, MessageEventArgs e)
         {
@@ -28,13 +32,23 @@ namespace BotVentic
                 string[] words = rawtext.Split(' ');
 
                 // Private message, check for invites
-                if (e.ServerId == null)
+                if (e.Server == null)
                 {
                     string[] inviteWords = new string[words.Length];
 
                     // support legacy "invite [link]" syntax
                     if (words[0] == "invite")
-                        Array.Copy(words, 1, inviteWords, 0, words.Length - 1);
+                    {
+                        if (words.Length >= 2)
+                        {
+                            Array.Copy(words, 1, inviteWords, 0, words.Length - 1);
+                        }
+                        else
+                        {
+                            await SendReply(client, e.Message, e.Message.Channel.Id, e.Message.Id, "Missing invite link");
+                        }
+                    }
+
                     else
                         Array.Copy(words, inviteWords, words.Length);
 
@@ -42,14 +56,18 @@ namespace BotVentic
                     {
                         try
                         {
-                            await ((DiscordClient)client).AcceptInvite(inviteWords[0]);
-                            await SendReply(client, e, "Joined!");
+
+                            var invite = await ((DiscordClient) client).GetInvite(inviteWords[0]);
+                            await invite.Accept();
+                            await SendReply(client, e.Message, e.Message.Channel.Id, e.Message.Id, "Joined!");
+
                         }
                         catch /*(Exception ex)*/
                         {
-                            
-                            Console.WriteLine("Failed to join channel");
-                            await SendReply(client, e, "Failed to join \"" + inviteWords[0] + "\"! Please double-check that the invite is valid and has not expired. If the issue persists, open an issue on the repository. !source for link.");
+
+                            //Console.WriteLine(ex.ToString());
+                            await SendReply(client, e.Message, e.Message.Channel.Id, e.Message.Id, "Failed to join \"" + inviteWords[0] + "\"! Please double-check that the invite is valid and has not expired. If the issue persists, open an issue on the repository. !source for link.");
+
                         }
                     }
                 }
@@ -60,33 +78,35 @@ namespace BotVentic
                 if (reply == null)
                     reply = HandleEmotesAndConversions(reply, words);
 
-                if (!String.IsNullOrWhiteSpace(reply))
+                if (!string.IsNullOrWhiteSpace(reply))
                 {
-                    await SendReply(client, e, reply);
+                    await SendReply(client, e.Message, e.Message.Channel.Id, e.Message.Id, reply);
                 }
             }
         }
 
-        public static async void HandleEdit(object client, MessageEventArgs e)
+        public static async void HandleEdit(object client, MessageUpdatedEventArgs e)
         {
-            GE = e;
+
+            GEE = e;
             // Don't handle own message or any message containing embeds that was *just* replied to
-            if (e != null && e.Message != null && !e.Message.IsAuthor && (e.Message.Embeds.Length == 0 || !IsMessageLastRepliedTo(e)))
+            if (e != null && e.Before != null && !e.Before.IsAuthor && ((e.Before.Embeds != null && e.Before.Embeds.Length == 0) || !IsMessageLastRepliedTo(e.Before.Channel.Id, e.Before.Id)))
             {
-                if (LastHandledMessageOnChannel.ContainsKey(e.Message.ChannelId))
-                    LastHandledMessageOnChannel.Remove(e.Message.ChannelId);
+                if (LastHandledMessageOnChannel.ContainsKey(e.Before.Channel.Id))
+                    LastHandledMessageOnChannel.Remove(e.Before.Channel.Id);
 
-                bool calcDate = (DateTime.Now - e.Message.Timestamp).Minutes < DiscordBot.EditThreshold;
-                string server = e.Message.Server == null ? "1-1" : e.Message.Server.Name;
-                string user = e.Message.User == null ? "?" : e.Message.User.Name;
-                string rawtext = e.Message.RawText ?? "";
 
-                Console.WriteLine(String.Format("[{0}][Edit] {1}: {2}", server, user, rawtext));
+                bool calcDate = (DateTime.Now - e.Before.Timestamp).Minutes < DiscordBot.EditThreshold;
+                string server = e.Before.Server == null ? "1-1" : e.Before.Server.Name;
+                string user = e.Before.User == null ? "?" : e.Before.User.Name;
+                string rawtext = e.Before.RawText ?? "";
+                Console.WriteLine(string.Format("[{0}][Edit] {1}: {2}", server, user, rawtext));
+
                 string reply = null;
                 string[] words = rawtext.Split(' ');
+                
 
-
-                reply = await HandleCommands(reply, words, e);
+                reply = await HandleCommands(reply, words, GE);
 
 
                 if (reply == null)
@@ -94,18 +114,20 @@ namespace BotVentic
                     reply = HandleEmotesAndConversions(reply, words);
                 }
 
-                if (!String.IsNullOrWhiteSpace(reply) && calcDate)
+                if (!string.IsNullOrWhiteSpace(reply) && calcDate)
                 {
-                    Message botRelation = GetExistingBotReplyOrNull(e.Message.Id);
+                    Message botRelation = GetExistingBotReplyOrNull(e.Before.Id);
                     if (botRelation == null)
                     {
-                        await SendReply(client, e, reply);
+                        await SendReply(client, e.After, e.After.Channel.Id, e.After.Id, reply);
                     }
                     else if (botRelation != null)
                     {
                         try
                         {
-                            await ((DiscordClient)client).EditMessage(botRelation, text: reply);
+
+                            await botRelation.Edit(reply);
+
                         }
                         catch (Exception ex)
                         {
@@ -116,13 +138,15 @@ namespace BotVentic
             }
         }
 
-        private static async System.Threading.Tasks.Task SendReply(object client, MessageEventArgs e, string reply)
+
+        private static async Task SendReply(object client, Message message, ulong channelId, ulong messageId, string reply)
         {
             try
             {
-                LastHandledMessageOnChannel[e.Message.ChannelId] = e.MessageId;
-                Message[] x = await ((DiscordClient)client).SendMessage(e.Message.ChannelId, reply);
-                AddBotReply(x[0], e.Message);
+                LastHandledMessageOnChannel[channelId] = messageId;
+                Message x = await ((DiscordClient) client).GetChannel(channelId).SendMessage(reply);
+                AddBotReply(x, message);
+
             }
             catch (Exception ex)
             {
@@ -130,9 +154,9 @@ namespace BotVentic
             }
         }
 
-        private static bool IsMessageLastRepliedTo(MessageEventArgs e)
+        private static bool IsMessageLastRepliedTo(ulong channelId, ulong messageId)
         {
-            return (LastHandledMessageOnChannel.ContainsKey(e.Message.ChannelId) && LastHandledMessageOnChannel[e.Message.ChannelId] == e.MessageId);
+            return (LastHandledMessageOnChannel.ContainsKey(channelId) && LastHandledMessageOnChannel[channelId] == messageId);
         }
 
         private static string HandleEmotesAndConversions(string reply, string[] words)
@@ -152,11 +176,12 @@ namespace BotVentic
                     found = IsWordEmote(code, ref reply, false);
                 }
 
-                else if (GE.ServerId != null && ChannelDefines.ContainsKey(GE.ServerId))
+                //@TODO: Check this later. See what a Null server would be
+                else if (GE.Server.Id != null && ChannelDefines.ContainsKey(GE.Server.Id))
                 {
-                    if (ChannelDefines[GE.ServerId].ContainsKey(word))
+                    if (ChannelDefines[GE.Server.Id].ContainsKey(word))
                     {
-                        reply = ChannelDefines[GE.ServerId][word] + (reply == "" ? "" : "\n") + reply;
+                        reply = ChannelDefines[GE.Server.Id][word] + (reply == "" ? "" : "\n") + reply;
                     }
 
                 }
@@ -321,21 +346,11 @@ namespace BotVentic
                 case "!joinffz":
                     
                     bool bUserHasBotRole = false;
-                    if (!e.Channel.IsPrivate)
-                    {
-                        foreach (var Role in e.Member.Roles)
-                        {
-                            if (Role.Name == "BotMaker")
-                            {
-                                bUserHasBotRole = true;
-                                break;//Leave foreach
-                            }
-                        }
-
-                        if (!bUserHasBotRole) { break; }//Leave switch statment
-                        int totalEmotes = await DiscordBot.AddFFZEmotes(words.ToList().GetRange(1, words.Length - 1).ToArray());
-                        reply = String.Format("({0}) New FFZ Emotes Added", totalEmotes);
-                    }
+                    if (e.Channel.IsPrivate || !UserHasRole("BotMaker")) { break;}
+                    
+                    if (!bUserHasBotRole) { break; }//Leave switch statement
+                    int totalEmotes = await DiscordBot.AddFFZEmotes(words.ToList().GetRange(1, words.Length - 1).ToArray());
+                    reply = String.Format("({0}) New FFZ Emotes Added", totalEmotes);
                     
                     break;
 
@@ -343,13 +358,13 @@ namespace BotVentic
                     if (!e.Channel.IsPrivate)
                     {
 
-                        if (!UserHasRole("BotMaker") || words.Length < 3) { break; }//Leave switch statment
-                        if (!ChannelDefines.ContainsKey(e.ServerId))
+                        if (!UserHasRole("BotMaker") || words.Length < 3) { break; }//Leave switch statement
+                        if (!ChannelDefines.ContainsKey(e.Server.Id))
                         {
-                            ChannelDefines[e.ServerId] = new Dictionary<string, string>();
+                            ChannelDefines[e.Server.Id] = new Dictionary<string, string>();
                         }
 
-                        ChannelDefines[e.ServerId][words[1]] = String.Join(" ", words.ToList().GetRange(2, words.Length - 2).ToArray());
+                        ChannelDefines[e.Server.Id][words[1]] = String.Join(" ", words.ToList().GetRange(2, words.Length - 2).ToArray());
                         DiscordBot.SaveConfig();
                     }
 
@@ -357,17 +372,17 @@ namespace BotVentic
                 case "#undef":
                     if (!e.Channel.IsPrivate)
                     {
-                        if (!UserHasRole("BotMaker") || words.Length < 1 || !ChannelDefines.ContainsKey(e.ServerId)) { break; }//Leave switch statment
-                        ChannelDefines[e.ServerId].Remove(words[1]);
+                        if (!UserHasRole("BotMaker") || words.Length < 1 || !ChannelDefines.ContainsKey(e.Server.Id)) { break; }//Leave switch statement
+                        ChannelDefines[e.Server.Id].Remove(words[1]);
                     }
 
                     break;
 
                 case "#list":
-                    if(!e.Channel.IsPrivate && UserHasRole("BotMaker") && ChannelDefines.ContainsKey(e.ServerId))
+                    if(!e.Channel.IsPrivate && UserHasRole("BotMaker") && ChannelDefines.ContainsKey(e.Server.Id))
                     {
                         reply = "Current Defines: ```";
-                        foreach(var kvp in ChannelDefines[e.ServerId])
+                        foreach(var kvp in ChannelDefines[e.Server.Id])
                         {
                             reply += String.Format("#{0}:\t{1}\n", kvp.Key, kvp.Value);
                         }
@@ -382,6 +397,12 @@ namespace BotVentic
                 case "#VERSION":
                     reply = "Version " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString() + "\nModified by bomb" ;
                     break;
+
+                case "#game":
+                    if (!UserHasRole("BotMaker") || words.Length < 1) { break; }//Leave switch statement
+                    DiscordBot.Client.SetGame(String.Join(" ",  words.ToList().GetRange(1, words.Length - 1)));
+
+                    break;
             }
 
             return reply;
@@ -389,20 +410,27 @@ namespace BotVentic
 
         private static void AddBotReply(Message bot, Message user)
         {
-            if (BotReplies.Count > DiscordBot.EditMax)
+            while (BotReplies.Count > DiscordBot.EditMax)
             {
-                BotReplies.Remove(BotReplies.Keys.ElementAt(0));
+                Message[] dummy;
+                BotReplies.TryDequeue(out dummy);
             }
-            BotReplies.Add(bot, user);
+            BotReplies.Enqueue(new Message[] { bot, user });
         }
 
-        private static Message GetExistingBotReplyOrNull(string id)
+        private enum MessageIndex
         {
-            foreach (KeyValuePair<Message, Message> item in BotReplies)
+            BotReply,
+            UserMessage
+        }
+
+        private static Message GetExistingBotReplyOrNull(ulong id)
+        {
+            foreach (var item in BotReplies)
             {
-                if (item.Value.Id == id)
+                if (item[(int)MessageIndex.UserMessage].Id == id)
                 {
-                    return item.Key;
+                    return item[(int)MessageIndex.BotReply];
                 }
             }
             return null;
@@ -419,7 +447,7 @@ namespace BotVentic
                 return false;
 
             bool bRoleFlag = false;
-            foreach (var Role in GE.Member.Roles)
+            foreach (var Role in GE.User.Roles)
             {
                 if (Role.Name == RoleName)
                 {

@@ -13,6 +13,13 @@ namespace BotVentic
 {
     class DiscordBot
     {
+        private enum ConnectionState
+        {
+            Connecting,
+            Connected,
+            Disconnected
+        }
+        private static ConnectionState State = ConnectionState.Disconnected;
         // DictEmotes <EmoteCode, { emote_id, emote_type }>
         public static ConcurrentDictionary<string, string[]> DictEmotes { get; private set; } = new ConcurrentDictionary<string, string[]>();
         public static string BttvTemplate { get; private set; }
@@ -37,7 +44,7 @@ namespace BotVentic
             }
         }
 
-        private static DiscordClient Client { get; set; }
+        public static DiscordClient Client { get; set; }
         private static Config Config { get; set; }
 
         private static object _lock = new object();
@@ -80,43 +87,47 @@ namespace BotVentic
 
             Console.WriteLine("Emotes acquired!");
 
-            Client = new DiscordClient(new DiscordClientConfig());
+            Client = new DiscordClient();
 
-            Client.MessageCreated += MessageHandler.HandleIncomingMessage;
-            Client.MessageUpdated += MessageHandler.HandleEdit;
-            Client.Disconnected += HandleDisconnect;
+            Client.MessageReceived += MessageHandler.HandleIncomingMessage;
+            //Client.MessageUpdated += MessageHandler.HandleEdit;
+            //Client.Disconnected += HandleDisconnect;
 
 
-            Connect();
+            KeepConnectionAlive();
             emoteUpdate.Wait();
         }
 
-        private static void HandleDisconnect(object sender, DisconnectedEventArgs e)
+        private static void KeepConnectionAlive()
         {
-            Console.WriteLine("Disconnected... Attempting to reconnect in 2 seconds.");
-            Thread.Sleep(2000);
-            Connect();
+            while (true)
+            {
+                Connect();
+                while (State != ConnectionState.Disconnected)
+                    Thread.Sleep(1000);
+                Thread.Sleep(5000);
+            }
         }
 
-        private static void Connect()
+        private static async void Connect()
         {
-            Client.Run(async () =>
-
+            State = ConnectionState.Connecting;
+            Console.WriteLine("Connecting...");
+            try
             {
-                Console.WriteLine("Connecting...");
-                try
-                {
-                    await Client.Connect(Config.Email, Config.Password);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.ToString());
-                    return;
-                }
-                Console.WriteLine("Connected!");
-
-                
-            });
+                await Client.Connect(Config.Email, Config.Password);
+                Client.SetGame("Being A Bot");
+                State = ConnectionState.Connected;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+                Console.WriteLine("Reconnecting...");
+                Client.Dispose();
+                State = ConnectionState.Disconnected;
+                return;
+            }
+            Console.WriteLine("Connected!");
         }
 
         /// <summary>

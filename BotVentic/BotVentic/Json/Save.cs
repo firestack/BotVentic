@@ -16,6 +16,6 @@ namespace BotVentic.Json
         public HashSet<String> FFZChannelSetIDs { get; set; }
 
         [JsonProperty("ChannelDefine")]
-        public Dictionary<string, Dictionary<string, string>> ChannelDefines { get; set; }
+        public Dictionary<ulong, Dictionary<string, string>> ChannelDefines { get; set; }
     }
 }

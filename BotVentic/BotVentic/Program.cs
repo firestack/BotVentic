@@ -38,8 +38,10 @@ namespace BotVenticService
             }
             else
             {
+
                 ServiceBase[] ServicesToRun;
                 ServicesToRun = new ServiceBase[]
+
                 {
                     new BotVentic.BDService()
                 };
