@@ -31,7 +31,7 @@ namespace BotVenticService
                         Console.WriteLine("Uninstalling service...");
                         break;
 
-                    case "--test":
+                    default:
                         BotVentic.DiscordBot.Mainloop();
                         break;
                 }
